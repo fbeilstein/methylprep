@@ -181,9 +181,9 @@ def cli_process(cmd_args):
     )
 
     parser.add_argument(
-        '-i','--bit',
+        '-i', '--bit',
         required=False,
-        choices=['float64','float32','float16'],
+        choices=['float64', 'float32', 'float16'],
         default='float32',
         help="Change the processed beta or m_value data_type output from float64 to float16 or float32, to save disk space.",
     )
@@ -260,7 +260,7 @@ def cli_process(cmd_args):
         print("Enabling --poobah corrections, because user specified --export_poobah.")
         args.poobah = True
 
-    if args.all == True:
+    if args.all:
         args.betas = True
         args.m_value = True
         args.uncorrected = True
@@ -371,12 +371,12 @@ def cli_beta_bakery(cmd_args):
     args = parser.parse_args(cmd_args)
     args.project_name = args.id
     args.move = True # moves all files out of temp-working-folder if called via CLI
-    delattr(args,'id')
-    if args.no_clean == True:
+    delattr(args, 'id')
+    if args.no_clean:
         args.clean = False
     else:
         args.clean = True
-    delattr(args,'no_clean')
+    delattr(args, 'no_clean')
     pipeline_find_betas_any_source(**vars(args))
 
 
@@ -437,12 +437,12 @@ def cli_download(cmd_args):
     )
 
     args = parser.parse_args(cmd_args)
-    if args.no_clean == True:
+    if args.no_clean:
         args.clean = False
     else:
         args.clean = True
 
-    if args.id == None and args.list == None:
+    if args.id is None and args.list is None:
         print("Missing parameter: either --id or --list are required")
         return
 
@@ -641,7 +641,7 @@ def cli_sample_sheet(cmd_args):
 
     parsed_args = parser.parse_args(cmd_args)
 
-    if parsed_args.create == True:
+    if parsed_args.create:
         from methylprep.files import create_sample_sheet
         create_sample_sheet(parsed_args.data_dir, matrix_file=False, output_file=parsed_args.output_file,
             sample_type=parsed_args.sample_type,

@@ -1,20 +1,16 @@
 # Lib
 import logging
 from ftplib import FTP
-import ftplib
-import socket
 from pathlib import Path, PurePath
 import os
 from tarfile import ReadError
 import re
-import zipfile
 import gzip
 import tarfile
 import zlib
 import shutil
 from bs4 import BeautifulSoup
 import dateutil # python-dateutil, non-built-in
-import datetime
 import pickle
 from urllib.request import urlopen
 import pandas as pd
@@ -47,12 +43,9 @@ except ImportError:
             read_csv : Read CSV (comma-separated) file into a DataFrame.
             read_html : Read HTML table into a DataFrame."""
             pass
-import io
 import json
-import time
 import tempfile
 import requests
-import zipfile
 import random
 import subprocess
 
@@ -918,16 +911,16 @@ def download_geo_processed(geo_id, working, verbose=False, use_headers=False):
             gsm_files = []
             for local_file in local_files:
                 if '.tgz' in Path(local_file).suffixes:
-                    if verbose == True:
+                    if verbose:
                         LOGGER.info(f"Unpacking: {local_file}")
                     shutil.unpack_archive(local_file)
                     all_files = list(Path(working.name).rglob('*'))
                     gsm_files = list(Path(working.name).rglob('GSM*.txt'))
                     non_gsm_files = [file for file in all_files if file not in gsm_files]
-                    if verbose == True:
+                    if verbose:
                         LOGGER.info(f"{len(all_files)} local_files, {len(gsm_files)}, non-GSM: {len(non_gsm_files)} | GSMs: {gsm_files}")
                 else:
-                    if verbose == True:
+                    if verbose:
                         LOGGER.info(f"local_file skipped: {local_file}")
             if len(gsm_files) > 0:
                 tbl_txt_files = True
@@ -975,9 +968,9 @@ def betas_from_tbl_txt_files(file_list, remove_after=True):
     except Exception as e:
         LOGGER.error("Could not concat these samples into a dataframe. The probe names in rows don't line up.")
         LOGGER.error(e)
-    if df_ok == False:
+    if not df_ok:
         return
-    if remove_after == True:
+    if remove_after:
         for file in file_list: # deleting source files
             FILE = Path(file)
             if FILE.suffix == '.txt' and FILE.name.startswith('GSM') and '-tbl' in FILE.name:

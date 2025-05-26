@@ -7,11 +7,10 @@ import logging
 import numpy as np
 import pandas as pd
 from statsmodels import robust
-from scipy.stats import norm, lognorm
+from scipy.stats import norm
 # App
 from ..models import ControlType, ArrayType
-from ..models.sketchy_probes import qualityMask450, qualityMaskEPIC, qualityMaskEPICPLUS, qualityMaskmouse
-
+from ..models.sketchy_probes import qualityMask
 
 __all__ = ['preprocess_noob']
 
@@ -32,9 +31,13 @@ def preprocess_noob(container, offset=15, pval_probes_df=None, quality_mask_df=N
     if nonlinear_dye_correction=True, this uses a sesame method in place of minfi method, in a later step.
     if unit_test_oob==True, returns the intermediate data instead of updating the SigSet/SampleDataContainer.
     """
+    is_probes_df = isinstance(pval_probes_df, pd.DataFrame)
+    is_mask_df = isinstance(quality_mask_df, pd.DataFrame)
+
     if debug:
-        print(f"DEBUG NOOB {debug} nonlinear_dye_correction={nonlinear_dye_correction}, pval_probes_df={pval_probes_df.shape if isinstance(pval_probes_df,pd.DataFrame) else 'None'}, quality_mask_df={quality_mask_df.shape if isinstance(quality_mask_df,pd.DataFrame) else 'None'}")
-    # stack- need one long list of values, regardless of Meth/Uneth
+        print(f"DEBUG NOOB {debug}nonlinear_dye_correction={nonlinear_dye_correction}, pval_probes_df={pval_probes_df.shape if is_probes_df else 'None'}, quality_mask_df={quality_mask_df.shape if isinstance(quality_mask_df,pd.DataFrame) else 'None'}")
+
+    # stack- need one long list of values, regardless of Meth/UnMeth
     ibG = pd.concat([
         container.ibG.reset_index().rename(columns={'Meth': 'mean_value'}).assign(used='M'),
         container.ibG.reset_index().rename(columns={'Unmeth': 'mean_value'}).assign(used='U')
@@ -49,8 +52,8 @@ def preprocess_noob(container, offset=15, pval_probes_df=None, quality_mask_df=N
 
     # out-of-band is Green-Unmeth and Red-Meth
     # exclude failing probes
-    pval = pval_probes_df.loc[ pval_probes_df['poobah_pval'] > container.poobah_sig ].index if isinstance(pval_probes_df, pd.DataFrame) else []
-    qmask = quality_mask_df.loc[ quality_mask_df['quality_mask'] == 0 ].index if isinstance(quality_mask_df, pd.DataFrame) else []
+    pval = pval_probes_df.loc[pval_probes_df['poobah_pval'] > container.poobah_sig].index if is_probes_df else []
+    qmask = quality_mask_df.loc[quality_mask_df['quality_mask'] == 0].index if is_mask_df else []
     # the ignored errors here should only be from probes that are both pval failures and qmask failures.
     Rmeth = list(container.oobR['Meth'].drop(index=pval, errors='ignore').drop(index=qmask, errors='ignore'))
     Runmeth = list(container.oobR['Unmeth'].drop(index=pval, errors='ignore').drop(index=qmask, errors='ignore'))
@@ -111,11 +114,12 @@ def preprocess_noob(container, offset=15, pval_probes_df=None, quality_mask_df=N
         }
 
     # by default, this last step is omitted for sesame
-    if nonlinear_dye_correction == True:
+    if nonlinear_dye_correction:
         # update() expects noob_red/green to have IlmnIDs in index, and contain bg_corrected for ALL probes.
         container.update_probe_means(noob_green, noob_red)
-    elif nonlinear_dye_correction == False:
-        # this "linear" method may be anologous to the ratio quantile normalization described in Nature: https://www.nature.com/articles/s41598-020-72664-6
+    elif not nonlinear_dye_correction:
+        # this "linear" method may be analogous to the ratio quantile normalization described in Nature:
+        # https://www.nature.com/articles/s41598-020-72664-6
         normexp_bg_correct_control(container.ctrl_green, params_green)
         normexp_bg_correct_control(container.ctrl_red, params_red)
         mask_green = container.ctrl_green['Control_Type'].isin(ControlType.normalization_green())
@@ -133,7 +137,7 @@ def preprocess_noob(container, offset=15, pval_probes_df=None, quality_mask_df=N
         container.update_probe_means(noob_green, noob_red)
 
 
-class BackgroundCorrectionParams():
+class BackgroundCorrectionParams:
     """ used in apply_bg_correction """
     __slots__ = (
         'bg_mean',
@@ -269,24 +273,21 @@ def _apply_sesame_quality_mask(data_container):
         to use TCGA masking, only applies to HM450
 
     """
-    if data_container.array_type not in (
-        # ArrayType.ILLUMINA_27K,
-        ArrayType.ILLUMINA_450K,
-        ArrayType.ILLUMINA_EPIC,
-        ArrayType.ILLUMINA_EPIC_PLUS,
-        ArrayType.ILLUMINA_MOUSE):
-        LOGGER.info(f"Quality masking is not supported for {data_container.array_type}.")
-        return
+
     # load set of probes to remove from local file
     if data_container.array_type == ArrayType.ILLUMINA_450K:
-        probes = qualityMask450
+        probes = qualityMask['450']['data']
     elif data_container.array_type == ArrayType.ILLUMINA_EPIC:
-        probes = qualityMaskEPIC
+        probes = qualityMask['EPIC']['data']
     elif data_container.array_type == ArrayType.ILLUMINA_EPIC_PLUS:
-        # this is a bit of a hack; probe names don't match epic, so I'm temporarily renaming, then filtering, then reverting.
-        probes = qualityMaskEPICPLUS
+        probes = qualityMask['EPIC_plus']['data']
     elif data_container.array_type == ArrayType.ILLUMINA_MOUSE:
-        probes = qualityMaskmouse
+        probes = qualityMask['Mouse']['data']
+    elif data_container.array_type == ArrayType.ILLUMINA_EPIC_V2:
+        probes = qualityMask['EPIC_v2']['data']
+    else:
+        LOGGER.info(f"Quality masking is not supported for {data_container.array_type}.")
+        return
 
     # v1.6+: the 1.0s are good probes and the 0.0 are probes to be excluded.
     cgs = pd.DataFrame( np.zeros((len(data_container.man.index), 1)), index=data_container.man.index, columns=['quality_mask'])

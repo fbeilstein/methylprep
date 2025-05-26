@@ -36,10 +36,10 @@ def qnorm_using_target(data, target):
     data and target in must be ndarray like np.transpose(np.array([IR1]))"""
     nrows = data.shape[0]
     ncols = data.shape[1]
-    targetrows = target.shape[0]
+    target_rows = target.shape[0]
     float_eps = np.finfo(np.float32).eps
 
-    if nrows != targetrows:
+    if nrows != target_rows:
         raise NotImplementedError('Data and target are different lengths')
     else:
         for j in range(ncols):
@@ -47,8 +47,8 @@ def qnorm_using_target(data, target):
             dimat = []
             for i in range(nrows):
                 if ~np.isnan(data[i, j]):
-                    dataitem = {'data': data[i, j], 'rank': i}
-                    dimat.append(dataitem)
+                    data_item = {'data': data[i, j], 'rank': i}
+                    dimat.append(data_item)
                     non_na += 1
 
             dimat = sorted(dimat, key=lambda k: k['data'])
@@ -62,8 +62,8 @@ def qnorm_using_target(data, target):
                         data[ind, j] = target[int(math.floor(ranks[i])-1)]
             else:
                 for i in range(non_na):
-                    samplepercentile = float(ranks[i] - 1)/float(non_na - 1)
-                    target_ind_double = 1.0 + (float(targetrows) - 1.0) * samplepercentile
+                    sample_percentile = float(ranks[i] - 1)/float(non_na - 1)
+                    target_ind_double = 1.0 + (float(target_rows) - 1.0) * sample_percentile
                     target_ind_double_floor = math.floor(target_ind_double + 4*float_eps)
                     target_ind_double = target_ind_double - target_ind_double_floor
                     if (math.fabs(target_ind_double) <= 4*float_eps):
@@ -80,10 +80,10 @@ def qnorm_using_target(data, target):
                     else:
                         target_ind = int(math.floor(target_ind_double_floor + 0.5))
                         ind = dimat[i]['rank']
-                        if ((target_ind < targetrows) and (target_ind > 0)):
-                             data[ind, j] = (1.0- target_ind_double)*target[target_ind-1] + target_ind_double*target[target_ind]
-                        elif (target_ind >= targetrows):
-                             data[ind, j] = target[targetrows-1]
+                        if (target_ind < target_rows) and (target_ind > 0):
+                            data[ind, j] = (1.0- target_ind_double)*target[target_ind-1] + target_ind_double*target[target_ind]
+                        elif target_ind >= target_rows:
+                            data[ind, j] = target[target_rows-1]
                         else:
                             data[ind, j] = target[0]
     # assuming I only need to return a single column here
@@ -121,26 +121,30 @@ def nonlinear_dye_bias_correction(container, debug=False):
         if mask.index.duplicated().sum() > 0:
             # equivalent to len(mask.index) > len(set(mask.index))
             LOGGER.info("Duplicate probe names found; switching to linear-dye correction.")
-            mask = None
+            #mask = None
             print(f'DEBUG dupes IR: {container.IR.index.duplicated().sum()} IG: {container.IG.index.duplicated().sum()}')
             return container
     else:
         mask = None # fetches everything
 
     # dye-correct NOOB or RAW intensities, depending on preprocessing flags here.
-    columns = {'noob_Meth':'Meth','noob_Unmeth':'Unmeth'} if container.do_noob == True else {'Meth':'Meth','Unmeth':'Unmeth'}
-    drop_columns = ['Meth', 'Unmeth', 'poobah_pval', 'used', 'AddressA_ID', 'AddressB_ID'] if container.do_noob == True else ['noob_Meth', 'noob_Unmeth', 'poobah_pval', 'used', 'AddressA_ID', 'AddressB_ID']
+    if container.do_noob:
+        columns = {'noob_Meth': 'Meth', 'noob_Unmeth': 'Unmeth'}
+        drop_columns = ['Meth', 'Unmeth', 'poobah_pval', 'used', 'AddressA_ID', 'AddressB_ID']
+    else:
+        columns = {'Meth': 'Meth', 'Unmeth': 'Unmeth'}
+        drop_columns = ['noob_Meth', 'noob_Unmeth', 'poobah_pval', 'used', 'AddressA_ID', 'AddressB_ID']
     if container.pval is False:
         drop_columns.remove('poobah_pval')
 
     if isinstance(mask,pd.Series):
         sub_mask = mask[mask.index.isin(container.IG.index)]
         IG0 = container.IG.join(sub_mask, how='inner')
-        IG0 = IG0[IG0['poobah_pval'] == True].drop(columns=drop_columns).rename(columns=columns).sort_index()
+        IG0 = IG0[IG0['poobah_pval']].drop(columns=drop_columns).rename(columns=columns).sort_index()
 
         sub_mask = mask[mask.index.isin(container.IR.index)]
         IR0 = container.IR.join(sub_mask, how='inner')
-        IR0 = IR0[IR0['poobah_pval'] == True].drop(columns=drop_columns).rename(columns=columns).sort_index()
+        IR0 = IR0[IR0['poobah_pval']].drop(columns=drop_columns).rename(columns=columns).sort_index()
     else:
         IG0 = container.IG.copy().drop(columns=drop_columns).rename(columns=columns).sort_index()
         IR0 = container.IR.copy().drop(columns=drop_columns).rename(columns=columns).sort_index()

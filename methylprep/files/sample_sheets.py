@@ -7,9 +7,7 @@ import re
 from ..models import Sample
 from ..utils import get_file_object, reset_file
 
-
-__all__ = ['SampleSheet', 'get_sample_sheet',  'get_sample_sheet_s3', 'find_sample_sheet', 'create_sample_sheet']
-
+__all__ = ['SampleSheet', 'get_sample_sheet', 'get_sample_sheet_s3', 'find_sample_sheet', 'create_sample_sheet']
 
 LOGGER = logging.getLogger(__name__)
 
@@ -17,7 +15,7 @@ REQUIRED_HEADERS = {'Sample_Name', 'Sentrix_ID', 'Sentrix_Position'}
 ALT_REQUIRED_HEADERS = {'Sample_Name', 'SentrixBarcode_A', 'SentrixPosition_A'}
 
 
-def get_sample_sheet(dir_path, filepath=None):
+def get_sample_sheet(dir_path, filepath=None, create_if_not_found=True):
     """Generates a SampleSheet instance for a given directory of processed data.
 
     Arguments:
@@ -30,11 +28,10 @@ def get_sample_sheet(dir_path, filepath=None):
     Returns:
         [SampleSheet] -- A SampleSheet instance.
     """
-    LOGGER.debug('Reading sample sheet')
+    LOGGER.info(f'Reading sample sheet from {filepath}')
 
     if not filepath:
-        filepath = find_sample_sheet(dir_path)
-
+        filepath = find_sample_sheet(dir_path, create_if_not_found=create_if_not_found)
     data_dir = PurePath(filepath).parent
     return SampleSheet(filepath, data_dir)
 
@@ -64,7 +61,7 @@ def get_sample_sheet_s3(zip_reader):
     raise FileNotFoundError('Could not find sample sheet in s3 file.')
 
 
-def find_sample_sheet(dir_path, return_all=False):
+def find_sample_sheet(dir_path, return_all=False, create_if_not_found=True):
     """Find sample sheet file for Illumina methylation array.
 
     Notes:
@@ -85,7 +82,7 @@ def find_sample_sheet(dir_path, return_all=False):
     Returns:
         [string] -- Path to sample sheet in base directory
     """
-    LOGGER.debug('Searching for sample_sheet in %s', dir_path)
+    LOGGER.info('Searching for sample_sheet in %s', dir_path)
 
     sample_dir = Path(dir_path)
 
@@ -110,12 +107,13 @@ def find_sample_sheet(dir_path, return_all=False):
             'pandas_can_open': SampleSheet.is_sample_sheet(csv_file)}
             for csv_file in csv_files
         ]
-        if errors == []:
-            raise FileNotFoundError(f"Could not find sample sheet.")
+        if create_if_not_found:
+            LOGGER.warning('[!] Sample sheet not found, creating one')
+            return create_sample_sheet(dir_path)
         else:
             raise FileNotFoundError(f"Could not find sample sheet. (candidate files: {errors})")
 
-    if num_candidates > 1:
+    elif num_candidates > 1:
         name_matched = [
             file_name
             for file_name in candidates
@@ -129,10 +127,11 @@ def find_sample_sheet(dir_path, return_all=False):
                 return name_matched
             else:
                 raise Exception(f"Too many sample sheets in this directory. Move or rename redundant ones. Or specify the path to the one to use with --sample_sheet. (candidate files: {candidates})")
+    else:
+        sample_sheet_file = candidates[0]
+        LOGGER.info('Found sample sheet file: %s', sample_sheet_file)
+        return sample_sheet_file
 
-    sample_sheet_file = candidates[0]
-    LOGGER.debug('Found sample sheet file: %s', sample_sheet_file)
-    return sample_sheet_file
 
 
 def create_sample_sheet(dir_path, matrix_file=False, output_file='samplesheet.csv',
@@ -210,9 +209,12 @@ def create_sample_sheet(dir_path, matrix_file=False, output_file='samplesheet.cs
             _dict['Sample_Name'].append("Sample_" + str(i))
 
     df = pd.DataFrame(data=_dict)
-    df.to_csv(path_or_buf=(PurePath(dir_path, output_file)),index=False)
+    filepath = f"{dir_path}/{output_file}"
+    df.to_csv(path_or_buf=filepath, index=False)
 
-    LOGGER.info(f"[!] Created sample sheet: {dir_path}/samplesheet.csv with {len(_dict['GSM_ID'])} GSM_IDs")
+    LOGGER.info(f"[!] Created sample sheet: {filepath} with {len(_dict['GSM_ID'])} GSM_IDs")
+
+    return filepath
 
 
 def sample_names_from_matrix(dir_path, ordered_GSMs=None):
@@ -314,9 +316,10 @@ class SampleSheet():
     @staticmethod
     def is_valid_csv(filepath_or_buffer):
         try:
-            data_frame = pd.read_csv(filepath_or_buffer, header=None, nrows=25)
+            pd.read_csv(filepath_or_buffer, header=None, nrows=25)
             return True
         except Exception:
+            print('invalid csv ', filepath_or_buffer)
             return False
 
     def get_samples(self):
@@ -499,6 +502,7 @@ class SampleSheet():
         cols = list(self.fields.values()) + ['Sample_ID']
         meta_frame = pd.DataFrame(columns=cols)
         # row contains the renamed fields, and pulls in the original data from sample_sheet
+        rows = []
         for sample in samples:
             row = {}
             for field in self.fields.keys():
@@ -511,5 +515,8 @@ class SampleSheet():
             # add the UID that matches m_value/beta value pickles
             #... unless there's a GSM_ID too
             row['Sample_ID'] = f"{row['Sentrix_ID']}_{row['Sentrix_Position']}"
-            meta_frame = meta_frame.append(row, ignore_index=True)
+            rows.append(row)
+
+        meta_frame = pd.DataFrame(columns=cols, data=rows)
+
         return meta_frame

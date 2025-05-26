@@ -3,18 +3,15 @@ from enum import IntEnum, unique
 import pandas as pd
 import numpy as np
 import struct
-from pprint import pprint
 import logging
 
 # App
 from ..utils import (
     get_file_object,
     read_and_reset,
-    read_byte,
     read_char,
     read_int,
     read_long,
-    read_results,
     read_short,
     read_string,
     npread,

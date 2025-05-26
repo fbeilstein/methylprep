@@ -1,10 +1,8 @@
 # Lib
 import os
 import logging
-from pathlib import Path, PurePath
+from pathlib import Path
 from urllib.request import urlopen
-import shutil
-import pandas as pd
 from bs4 import BeautifulSoup
 import re
 # App

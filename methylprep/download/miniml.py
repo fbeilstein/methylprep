@@ -1,10 +1,8 @@
 import re
 from pathlib import Path
-import shutil
 from bs4 import BeautifulSoup
 import pandas as pd
 import tarfile
-from tarfile import ReadError
 from tqdm import tqdm
 from ftplib import FTP
 import logging
@@ -12,7 +10,6 @@ import time
 # app
 from .samplesheet_sync_idat import remove_idats_not_in_samplesheet
 from methylprep import run_pipeline
-#from methylprep.download.process_data import run_series --- breaks, dunno why!
 import methylprep.download.process_data
 
 LOGGER = logging.getLogger(__name__)

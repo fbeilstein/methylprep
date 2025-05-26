@@ -1,33 +1,28 @@
-import numpy as np
 import pandas as pd
-from pathlib import Path
-try:
-    from importlib import resources # py >= 3.7
-except ImportError: # py < 3.7
-    import pkg_resources
-    loader = pkg_resources.resource_filename
+
+
 pkg_namespace = 'methylprep.models'
 
+qualityMask = {
+    "450": {"filename": 'qualityMask450.txt.gz'},
+    "EPIC": {"filename": 'qualityMaskEPIC.txt.gz'},
+    "EPIC_plus": {"filename": 'qualityMaskEPICPLUS.txt.gz'},
+    "EPIC_v2": {"filename": 'qualityMaskEPICv2.txt.gz'},
+    "MOUSE": {"filename": 'qualityMaskmouse.txt.gz'}
+}
+
 try:
-    if pkg_resources:
-        # resource_filename context manager does not support "with"
-        probe_filepath = loader(pkg_namespace, 'qualityMask450.txt.gz')
-        qualityMask450 = pd.read_csv(probe_filepath)['x']
-        probe_filepath = loader(pkg_namespace, 'qualityMaskEPIC.txt.gz')
-        qualityMaskEPIC = pd.read_csv(probe_filepath)['x']
-        probe_filepath = loader(pkg_namespace, 'qualityMaskEPICPLUS.txt.gz')
-        qualityMaskEPICPLUS = pd.read_csv(probe_filepath)['x']
-        probe_filepath = loader(pkg_namespace, 'qualityMaskmouse.txt.gz')
-        qualityMaskmouse = pd.read_csv(probe_filepath)['x']
-except:
-    with resources.path(pkg_namespace, 'qualityMask450.txt.gz') as probe_filepath:
-        qualityMask450 = pd.read_csv(probe_filepath)['x']
-    with resources.path(pkg_namespace, 'qualityMaskEPIC.txt.gz') as probe_filepath:
-        qualityMaskEPIC = pd.read_csv(probe_filepath)['x']
-    with resources.path(pkg_namespace, 'qualityMaskEPICPLUS.txt.gz') as probe_filepath:
-        qualityMaskEPICPLUS = pd.read_csv(probe_filepath)['x']
-    with resources.path(pkg_namespace, 'qualityMaskmouse.txt.gz') as probe_filepath:
-        qualityMaskmouse = pd.read_csv(probe_filepath)['x']
+    from importlib import resources  # py >= 3.7
+    for version in qualityMask.keys():
+        with resources.path(pkg_namespace, qualityMask[version]['filename']) as probe_filepath:
+            qualityMask[version]['data'] = pd.read_csv(probe_filepath)['x']
+except ImportError:  # py < 3.7
+    import pkg_resources
+    loader = pkg_resources.resource_filename
+    # resource_filename context manager does not support "with"
+    for version in qualityMask.keys():
+        probe_filepath = loader(pkg_namespace, qualityMask[version]['filename'])
+        qualityMask[version]['data'] = pd.read_csv(probe_filepath)['x']
 
 
 """
@@ -59,3 +54,4 @@ def sketchy_probes_warning(filepath):
 # qualityMaskEPICPLUS_r.to_csv('/Users/mmaxmeister/methylprep/methylprep/models/qualityMaskEPICPLUS.txt', index=False)
 # qualityMaskEPICPLUS = qualityMaskEPICPLUS.apply( lambda row: row.split('_')[0] )
 # in preprocess.py, I'm simply passing through all 3889 probes whose EPIC names don't match EPIC+ cg.... names.
+# mask data from EPICv2 come from https://zwdzwd.github.io/InfiniumAnnotation

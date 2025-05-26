@@ -6,13 +6,14 @@ LOGGER = logging.getLogger(__name__)
 
 @unique
 class ArrayType(Enum):
-    """This class stores meta data about array types, such as numbers of probes of each type, and how to guess the array from probes in idat files."""
+    """This class stores metadata about array types, such as numbers of probes of each type, and how to guess the array from probes in idat files."""
 
     CUSTOM = 'custom'
     ILLUMINA_27K = '27k'
     ILLUMINA_450K = '450k'
     ILLUMINA_EPIC = 'epic'
     ILLUMINA_EPIC_PLUS = 'epic+'
+    ILLUMINA_EPIC_V2 = 'epicv2'
     ILLUMINA_MOUSE = 'mouse'
 
     def __str__(self):
@@ -21,6 +22,9 @@ class ArrayType(Enum):
     @classmethod
     def from_probe_count(cls, probe_count):
         """Determines array type using number of probes counted in raw idat file. Returns array string."""
+        if probe_count == 1105209:
+            return cls.ILLUMINA_EPIC_V2
+
         if probe_count == 1055583 or probe_count == 868578:
             return cls.ILLUMINA_EPIC_PLUS
 
@@ -40,8 +44,8 @@ class ArrayType(Enum):
             #mm295 v2 ??s
 
         if 56000 <= probe_count <= 1100000:
-            LOGGER.warning(f'Probe count ({probe_count}) falls outside of normal range. Setting to newest array type: EPIC')
-            return cls.ILLUMINA_EPIC
+            LOGGER.warning(f'Probe count ({probe_count}) falls outside of normal range. Setting to newest array type: EPIC V2')
+            return cls.ILLUMINA_EPIC_V2
 
         raise ValueError(f'Unknown array type: ({probe_count} probes detected)')
 
@@ -52,6 +56,7 @@ class ArrayType(Enum):
             ArrayType.ILLUMINA_27K: 27578,
             ArrayType.ILLUMINA_450K: 485577,
             ArrayType.ILLUMINA_EPIC: 865918,
+            ArrayType.ILLUMINA_EPIC_V2: 937055,
             ArrayType.ILLUMINA_MOUSE: 293199, # MM285_v2 added 615 missing probes
             ArrayType.ILLUMINA_EPIC_PLUS: 868698,
             #NOTE: if EPIC+ is not set to 868699, noob fails downstream. but there are only 868698 probes by my count.
@@ -75,20 +80,12 @@ class ArrayType(Enum):
             ArrayType.ILLUMINA_450K: 850,
             ArrayType.ILLUMINA_EPIC: 635,
             ArrayType.ILLUMINA_EPIC_PLUS: 635,
-            ArrayType.ILLUMINA_MOUSE: 635 # 1966 controls in B3, and in sesame's manifest, but not in MM285_v2 or v3.
+            ArrayType.ILLUMINA_EPIC_V2: 635,
+            ArrayType.ILLUMINA_MOUSE: 635  # 1966 controls in B3, and in sesame's manifest, but not in MM285_v2 or v3.
         }
         return probe_counts.get(self)
 
-    @property
-    def num_snps(self): # not used anywhere in v1.5.0+
-        probe_counts = {
-            ArrayType.ILLUMINA_27K: 0,
-            ArrayType.ILLUMINA_450K: 65,
-            ArrayType.ILLUMINA_EPIC: 59,
-            ArrayType.ILLUMINA_EPIC_PLUS: 120,
-            ArrayType.ILLUMINA_MOUSE: 1485, #1353, #in v2: 536, #was at end of file, now before control (testing)
-        }
-        return probe_counts.get(self)
+
 
 """ # doesn't appear to be used anywhere. -- and pipeline Array model conflicts with it.
 class Array():

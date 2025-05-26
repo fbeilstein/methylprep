@@ -66,7 +66,7 @@ def consolidate_values_for_sheet(data_containers, postprocess_func_colname='beta
     Options:
         bit (float16, float32, float64) -- change the default data type from float32
             to another type to save disk space. float16 works fine, but might not be compatible
-            with all numnpy/pandas functions, or with outside packages, so float32 is default.
+            with all numpy/pandas functions, or with outside packages, so float32 is default.
             This is specified from methylprep process command line.
         poobah
             If true, filters by the poobah_pval column. (beta m_val pass True in for this.)
@@ -77,18 +77,22 @@ def consolidate_values_for_sheet(data_containers, postprocess_func_colname='beta
             before exporting to file."""
     poobah_column = 'poobah_pval'
     quality_mask = 'quality_mask'
-    for idx,sample in enumerate(data_containers):
+    merged = None
+
+    for sample in data_containers:
         sample_id = f"{sample.sample.sentrix_id}_{sample.sample.sentrix_position}"
 
-        if poobah == True and poobah_column in sample._SampleDataContainer__data_frame.columns:
+        if poobah and poobah_column in sample._SampleDataContainer__data_frame.columns:
             # remove all failed probes by replacing with NaN before building DF.
-            sample._SampleDataContainer__data_frame.loc[sample._SampleDataContainer__data_frame[poobah_column] >= poobah_sig, postprocess_func_colname] = np.nan
-        elif poobah == True and poobah_column not in sample._SampleDataContainer__data_frame.columns:
+            location = sample._SampleDataContainer__data_frame[poobah_column] >= poobah_sig, postprocess_func_colname
+            sample._SampleDataContainer__data_frame.loc[location] = np.nan
+        elif poobah and poobah_column not in sample._SampleDataContainer__data_frame.columns:
             LOGGER.warning('DEBUG: missing poobah')
 
-        if sample.quality_mask == True and quality_mask in sample._SampleDataContainer__data_frame.columns:
+        if sample.quality_mask and quality_mask in sample._SampleDataContainer__data_frame.columns:
             # blank there probes where quality_mask == 0
-            sample._SampleDataContainer__data_frame.loc[sample._SampleDataContainer__data_frame[quality_mask] == 0, postprocess_func_colname] = np.nan
+            location = sample._SampleDataContainer__data_frame[quality_mask] == 0, postprocess_func_colname
+            sample._SampleDataContainer__data_frame.loc[location] = np.nan
 
         this_sample_values = sample._SampleDataContainer__data_frame[postprocess_func_colname]
 
@@ -96,11 +100,10 @@ def consolidate_values_for_sheet(data_containers, postprocess_func_colname='beta
             mask_snps = (sample._SampleDataContainer__data_frame.index.str.startswith('rs'))
             this_sample_values = this_sample_values.loc[ ~mask_snps ]
 
-        if idx == 0:
+        if merged is None:
             merged = pd.DataFrame(this_sample_values, columns=[postprocess_func_colname])
-            merged.rename(columns={postprocess_func_colname: sample_id}, inplace=True)
-            continue
-        merged = pd.concat([merged, this_sample_values], axis=1)
+        else:
+            merged = pd.concat([merged, this_sample_values], axis=1)
         merged.rename(columns={postprocess_func_colname: sample_id}, inplace=True)
     if bit != 'float32' and bit in ('float64','float16'):
         merged = merged.astype(bit)

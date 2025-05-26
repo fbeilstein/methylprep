@@ -9,8 +9,6 @@ from ..models import ArrayType, Channel, ProbeType
 from ..utils import (
     download_file,
     get_file_object,
-    inner_join_data,
-    is_file_like,
     reset_file,
 )
 
@@ -34,6 +32,8 @@ ARRAY_FILENAME = {
     'epic': 'HumanMethylationEPIC_manifest_v2.csv.gz',
     #'MethylationEPIC_v-1-0_B4.CoreColumns.csv.gz',
     'epic+': 'CombinedManifestEPIC_manifest_CoreColumns_v2.csv.gz',
+    # as found in https://support.illumina.com/downloads/infinium-methylationepic-v2-0-product-files.html :
+    'epicv2': 'EPIC-8v2-0_A1.csv',
     #'CombinedManifestEPIC.manifest.CoreColumns.csv.gz',
     'mouse': 'MM285_manifest_v3.csv.gz',
     #'MM285_mm39_manifest_v2.csv.gz',
@@ -44,6 +44,7 @@ ARRAY_TYPE_MANIFEST_FILENAMES = {
     ArrayType.ILLUMINA_450K: ARRAY_FILENAME['450k'],
     ArrayType.ILLUMINA_EPIC: ARRAY_FILENAME['epic'],
     ArrayType.ILLUMINA_EPIC_PLUS: ARRAY_FILENAME['epic+'],
+    ArrayType.ILLUMINA_EPIC_V2: ARRAY_FILENAME['epicv2'],
     ArrayType.ILLUMINA_MOUSE: ARRAY_FILENAME['mouse'],
 }
 MANIFEST_COLUMNS = (
@@ -61,6 +62,17 @@ MANIFEST_COLUMNS = (
     'OLD_MAPINFO',
     'OLD_Strand',
 )
+
+MANIFEST_COLUMNS_V2 = (
+    'IlmnID',
+    'AddressA_ID',
+    'AddressB_ID',
+    'Infinium_Design_Type',
+    'Color_Channel',
+    'Genome_Build',
+    'CHR',
+    'MAPINFO',
+    'Strand_FR')
 
 MOUSE_MANIFEST_COLUMNS = (
     'IlmnID',
@@ -131,6 +143,8 @@ class Manifest():
     def columns(self):
         if self.array_type == ArrayType.ILLUMINA_MOUSE:
             return MOUSE_MANIFEST_COLUMNS
+        elif self.array_type == ArrayType.ILLUMINA_EPIC_V2:
+            return MANIFEST_COLUMNS_V2
         else:
             return MANIFEST_COLUMNS
 
